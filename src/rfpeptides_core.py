@@ -8,11 +8,17 @@ using RFdiffusion:
 3. design_cyclic_binder_with_hotspots: Design with epitope-specific targeting
 """
 
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Union, Optional
 
-from .runner import run_rfdiffusion, RFDiffusionConfig
+# Add src directory to path for standalone execution
+_src_dir = Path(__file__).parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
+from runner import run_rfdiffusion, RFDiffusionConfig
 
 
 def _get_chain_residue_range(pdb_path: str, chain_id: str) -> tuple[int, int]:

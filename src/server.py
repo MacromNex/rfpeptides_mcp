@@ -8,14 +8,20 @@ This module exposes the three core RFpeptides functions as MCP tools:
 All long-running tasks use async job submission with FIFO queue management.
 """
 
+import sys
 from pathlib import Path
 from typing import Annotated, Optional
 
+# Add src directory to path for standalone execution (fastmcp run)
+_src_dir = Path(__file__).parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 from fastmcp import FastMCP
 
-from .rfpeptides_core import _parse_length, _get_chain_residue_range
-from .runner import get_rfdiffusion_info
-from .jobs.manager import job_manager
+from rfpeptides_core import _parse_length, _get_chain_residue_range
+from runner import get_rfdiffusion_info
+from jobs.manager import job_manager
 
 # Create the MCP server
 mcp = FastMCP(

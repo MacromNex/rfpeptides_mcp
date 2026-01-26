@@ -1,6 +1,6 @@
 # RFpeptides MCP
 
-> MCP tools for cyclic peptide backbone generation using RFdiffusion
+> MCP tools for cyclic peptide design using RFpeptides
 
 ## Table of Contents
 - [Overview](#overview)
@@ -326,6 +326,7 @@ python scripts/manage_jobs.py recover
 ## MCP Server Installation
 
 ```shell
+mamba activate ./env
 fastmcp install claude-code src/server.py --name rfpeptides_mcp
 ```
 
