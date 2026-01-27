@@ -176,8 +176,10 @@ def design_cyclic_binder(
     else:
         start, end = _get_chain_residue_range(target_pdb, target_chain)
 
-    contigs = f"{target_chain}{start}-{end}/0 {min_len}-{max_len}"
-    output_prefix = target_path.stem + "_binder"
+    # Contigs format: [binder_length target_chain_range/0]
+    # Binder comes first (becomes chain 'a'), target second
+    contigs = f"{min_len}-{max_len} {target_chain}{start}-{end}/0"
+    output_prefix = target_path.stem + "_cyclic_binder"
 
     config = RFDiffusionConfig(
         output_prefix=str(Path(output_dir) / output_prefix),
@@ -185,7 +187,7 @@ def design_cyclic_binder(
         input_pdb=str(target_pdb),
         contigs=contigs,
         cyclic=True,
-        cyc_chains="B",  # uppercase = binder chain
+        cyc_chains="a",  # lowercase 'a' = self-cyclic binder (first chain)
         diffusion_steps=diffusion_steps,
     )
 
@@ -250,12 +252,14 @@ def design_cyclic_binder_with_hotspots(
     else:
         start, end = _get_chain_residue_range(target_pdb, target_chain)
 
-    contigs = f"{target_chain}{start}-{end}/0 {min_len}-{max_len}"
+    # Contigs format: [binder_length target_chain_range/0]
+    # Binder comes first (becomes chain 'a'), target second
+    contigs = f"{min_len}-{max_len} {target_chain}{start}-{end}/0"
 
     # Format hotspot residues: [A46,A48,A49,...]
     hotspot_str = ",".join(f"{target_chain}{res}" for res in hotspot_residues)
 
-    output_prefix = target_path.stem + "_epitope"
+    output_prefix = target_path.stem + "_cyclic_epitope"
 
     config = RFDiffusionConfig(
         output_prefix=str(Path(output_dir) / output_prefix),
@@ -263,7 +267,7 @@ def design_cyclic_binder_with_hotspots(
         input_pdb=str(target_pdb),
         contigs=contigs,
         cyclic=True,
-        cyc_chains="B",
+        cyc_chains="a",  # lowercase 'a' = self-cyclic binder (first chain)
         diffusion_steps=diffusion_steps,
         hotspot_res=hotspot_str,
     )

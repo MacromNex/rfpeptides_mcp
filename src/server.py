@@ -160,6 +160,10 @@ def submit_cyclic_backbone(
         int,
         "Number of diffusion timesteps (higher = more diverse, default: 50)"
     ] = 50,
+    device: Annotated[
+        Optional[int],
+        "CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU."
+    ] = None,
     job_name: Annotated[
         Optional[str],
         "Optional name for job tracking"
@@ -181,6 +185,7 @@ def submit_cyclic_backbone(
         num_designs: Number of backbone designs to generate
         peptide_length_max: Maximum length for variable-length generation
         diffusion_steps: Number of diffusion timesteps (default: 50)
+        device: CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU.
         job_name: Optional name for job tracking
 
     Returns:
@@ -199,6 +204,7 @@ def submit_cyclic_backbone(
         "cyclic": True,
         "cyc_chains": "a",  # lowercase = self-cyclic
         "diffusion_steps": diffusion_steps,
+        "device": device,
     }
 
     return job_manager.submit_job(
@@ -241,6 +247,14 @@ def submit_cyclic_binder(
         int,
         "Number of diffusion timesteps (default: 50)"
     ] = 50,
+    cyclic: Annotated[
+        bool,
+        "Generate cyclic peptide binders (default: True)"
+    ] = True,
+    device: Annotated[
+        Optional[int],
+        "CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU."
+    ] = None,
     job_name: Annotated[
         Optional[str],
         "Optional name for job tracking"
@@ -263,6 +277,8 @@ def submit_cyclic_binder(
         target_start_residue: Start residue number of target to include
         target_end_residue: End residue number of target to include
         diffusion_steps: Number of diffusion timesteps (default: 50)
+        cyclic: Generate cyclic peptide binders (default: True)
+        device: CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU.
         job_name: Optional name for job tracking
 
     Returns:
@@ -278,17 +294,21 @@ def submit_cyclic_binder(
     else:
         start, end = _get_chain_residue_range(target_pdb, target_chain)
 
-    contigs = f"{target_chain}{start}-{end}/0 {min_len}-{max_len}"
-    output_prefix = target_path.stem + "_binder"
+    # Contigs format: [binder_length target_chain_range/0]
+    # Binder comes first (becomes chain 'a'), target second
+    contigs = f"{min_len}-{max_len} {target_chain}{start}-{end}/0"
+    suffix = "_cyclic_binder" if cyclic else "_binder"
+    output_prefix = target_path.stem + suffix
 
     config = {
         "output_prefix": output_prefix,
         "num_designs": num_designs,
         "input_pdb": str(target_pdb),
         "contigs": contigs,
-        "cyclic": True,
-        "cyc_chains": "B",  # uppercase = binder chain
+        "cyclic": cyclic,
+        "cyc_chains": "a" if cyclic else "",  # lowercase 'a' = self-cyclic binder (first chain)
         "diffusion_steps": diffusion_steps,
+        "device": device,
     }
 
     return job_manager.submit_job(
@@ -335,6 +355,14 @@ def submit_cyclic_binder_with_hotspots(
         int,
         "Number of diffusion timesteps (default: 50)"
     ] = 50,
+    cyclic: Annotated[
+        bool,
+        "Generate cyclic peptide binders (default: True)"
+    ] = True,
+    device: Annotated[
+        Optional[int],
+        "CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU."
+    ] = None,
     job_name: Annotated[
         Optional[str],
         "Optional name for job tracking"
@@ -361,6 +389,8 @@ def submit_cyclic_binder_with_hotspots(
         target_start_residue: Start residue number of target to include
         target_end_residue: End residue number of target to include
         diffusion_steps: Number of diffusion timesteps (default: 50)
+        cyclic: Generate cyclic peptide binders (default: True)
+        device: CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU.
         job_name: Optional name for job tracking
 
     Returns:
@@ -376,22 +406,26 @@ def submit_cyclic_binder_with_hotspots(
     else:
         start, end = _get_chain_residue_range(target_pdb, target_chain)
 
-    contigs = f"{target_chain}{start}-{end}/0 {min_len}-{max_len}"
+    # Contigs format: [binder_length target_chain_range/0]
+    # Binder comes first (becomes chain 'a'), target second
+    contigs = f"{min_len}-{max_len} {target_chain}{start}-{end}/0"
 
     # Format hotspot residues: A46,A48,A49,...
     hotspot_str = ",".join(f"{target_chain}{res}" for res in hotspot_residues)
 
-    output_prefix = target_path.stem + "_epitope"
+    suffix = "_cyclic_epitope" if cyclic else "_epitope"
+    output_prefix = target_path.stem + suffix
 
     config = {
         "output_prefix": output_prefix,
         "num_designs": num_designs,
         "input_pdb": str(target_pdb),
         "contigs": contigs,
-        "cyclic": True,
-        "cyc_chains": "B",
+        "cyclic": cyclic,
+        "cyc_chains": "a" if cyclic else "",  # lowercase 'a' = self-cyclic binder (first chain)
         "diffusion_steps": diffusion_steps,
         "hotspot_res": hotspot_str,
+        "device": device,
     }
 
     return job_manager.submit_job(

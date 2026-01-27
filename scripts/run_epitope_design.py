@@ -1,13 +1,16 @@
 #!/usr/bin/env python
-"""Run epitope-specific cyclic peptide binder design with hotspot guidance.
+"""Run epitope-specific peptide binder design with hotspot guidance.
 
 This script covers Use Case 3 from the RFpeptides paper:
 - Epitope-specific targeting with hotspot residues
 - LIR-docking site on GABARAP
 - Specific surface residues on RbtA
 
+Supports both linear (default) and cyclic peptide binders.
+
 Usage:
     python run_epitope_design.py --target gabarap --num-designs 50
+    python run_epitope_design.py --target gabarap --num-designs 50 --cyclic
     python run_epitope_design.py --pdb target.pdb --hotspots 46 48 49 50 --num-designs 100
 """
 
@@ -15,12 +18,13 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add src to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 MCP_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(MCP_ROOT))
 
-from src.jobs.manager import job_manager
+from rfpeptides_core import design_binder_with_hotspots
+
+# Default output directory
+DEFAULT_OUTPUT_DIR = MCP_ROOT / "results" / "epitope_outputs"
 
 
 # Predefined targets with hotspot information
@@ -54,15 +58,21 @@ TARGETS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run epitope-specific cyclic peptide binder design",
+        description="Run epitope-specific peptide binder design (linear or cyclic)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    # Design GABARAP binders targeting LIR-docking site
+    # Design linear binders targeting GABARAP LIR-docking site
     python run_epitope_design.py --target gabarap --num-designs 50
+
+    # Design cyclic binders targeting GABARAP
+    python run_epitope_design.py --target gabarap --num-designs 50 --cyclic
 
     # Design with custom hotspots
     python run_epitope_design.py --pdb target.pdb --hotspots 46 48 49 50 60 63 --num-designs 100
+
+    # Design cyclic binders with custom output directory
+    python run_epitope_design.py --target mcl1 --num-designs 20 --cyclic --output-dir ./my_outputs
 
     # List available predefined targets with hotspots
     python run_epitope_design.py --list-targets
@@ -119,19 +129,28 @@ Examples:
         help="Number of diffusion timesteps (default: 50)",
     )
     parser.add_argument(
-        "--job-name",
+        "--output-dir",
         type=str,
-        help="Custom job name",
+        default=str(DEFAULT_OUTPUT_DIR),
+        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
+    )
+    parser.add_argument(
+        "--device",
+        type=int,
+        default=None,
+        metavar="ID",
+        help="CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU.",
+    )
+    parser.add_argument(
+        "--cyclic",
+        action="store_true",
+        default=False,
+        help="Generate cyclic peptide binders (default: linear binders)",
     )
     parser.add_argument(
         "--list-targets",
         action="store_true",
         help="List available predefined targets with hotspots",
-    )
-    parser.add_argument(
-        "--wait",
-        action="store_true",
-        help="Wait for job to complete before exiting",
     )
 
     args = parser.parse_args()
@@ -163,75 +182,53 @@ Examples:
         residue_range = target_info["residue_range"]
         binder_length = target_info["binder_length"]
         hotspots = target_info["hotspots"]
-        job_name = args.job_name or f"epitope_{args.target}"
     else:
         pdb_path = args.pdb
         chain = args.chain
         residue_range = tuple(args.residue_range) if args.residue_range else None
         binder_length = tuple(args.binder_length)
         hotspots = args.hotspots
-        job_name = args.job_name or f"epitope_{Path(pdb_path).stem}"
 
-    # Build config
-    if residue_range:
-        contigs = f"{chain}{residue_range[0]}-{residue_range[1]}/0 {binder_length[0]}-{binder_length[1]}"
-    else:
-        # Auto-detect from PDB
-        from src.rfpeptides_core import _get_chain_residue_range
-        start, end = _get_chain_residue_range(pdb_path, chain)
-        contigs = f"{chain}{start}-{end}/0 {binder_length[0]}-{binder_length[1]}"
-
-    # Format hotspot residues
-    hotspot_str = ",".join(f"{chain}{res}" for res in hotspots)
-
-    config = {
-        "output_prefix": f"{Path(pdb_path).stem}_epitope",
-        "num_designs": args.num_designs,
-        "input_pdb": pdb_path,
-        "contigs": contigs,
-        "cyclic": True,
-        "cyc_chains": "B",
-        "diffusion_steps": args.diffusion_steps,
-        "hotspot_res": hotspot_str,
-    }
-
-    # Submit job
-    print(f"Submitting epitope-specific binder design job...")
+    # Run directly (no job queue)
+    binder_type = "cyclic" if args.cyclic else "linear"
+    print(f"Running epitope-specific {binder_type} binder design...")
     print(f"  Target: {pdb_path}")
     print(f"  Chain: {chain}")
     print(f"  Hotspots: {hotspots}")
     print(f"  Binder length: {binder_length[0]}-{binder_length[1]} residues")
+    print(f"  Cyclic: {args.cyclic}")
     print(f"  Num designs: {args.num_designs}")
+    print(f"  Output dir: {args.output_dir}")
+    print(f"  Device: {args.device if args.device is not None else 'default'}")
     print()
 
-    result = job_manager.submit_job(config=config, job_name=job_name)
+    try:
+        result = design_binder_with_hotspots(
+            target_pdb=pdb_path,
+            hotspot_residues=hotspots,
+            binder_length=binder_length,
+            num_designs=args.num_designs,
+            output_dir=args.output_dir,
+            target_chain=chain,
+            target_residue_range=residue_range,
+            diffusion_steps=args.diffusion_steps,
+            device=args.device,
+            cyclic=args.cyclic,
+        )
 
-    print(f"Job submitted: {result['job_id']}")
-    print(f"Queue position: {result['queue_position']}")
+        print(f"Design completed successfully!")
+        print(f"Generated {result.num_generated} designs")
+        print(f"Output directory: {result.output_dir}")
+        print()
+        print("PDB files:")
+        for pdb in result.pdb_files[:10]:  # Show first 10
+            print(f"  {pdb}")
+        if len(result.pdb_files) > 10:
+            print(f"  ... and {len(result.pdb_files) - 10} more")
 
-    if args.wait:
-        import time
-        print()
-        print("Waiting for job to complete...")
-        job_id = result['job_id']
-        while True:
-            status = job_manager.get_job_status(job_id)
-            if status['status'] in ['completed', 'failed', 'cancelled']:
-                break
-            time.sleep(5)
-
-        print()
-        if status['status'] == 'completed':
-            result_info = job_manager.get_job_result(job_id)
-            print(f"Job completed successfully!")
-            print(f"Output files ({result_info.get('num_generated', 0)} designs):")
-            for pdb in result_info.get('pdb_files', []):
-                print(f"  {pdb}")
-        else:
-            print(f"Job {status['status']}: {status.get('error', 'Unknown error')}")
-    else:
-        print()
-        print(f"Check status: python scripts/manage_jobs.py status {result['job_id']}")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

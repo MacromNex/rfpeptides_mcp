@@ -15,12 +15,13 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add src to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
 MCP_ROOT = SCRIPT_DIR.parent
-sys.path.insert(0, str(MCP_ROOT))
 
-from src.jobs.manager import job_manager
+from rfpeptides_core import generate_cyclic_backbone
+
+# Default output directory
+DEFAULT_OUTPUT_DIR = MCP_ROOT / "results" / "backbone_outputs"
 
 
 def main():
@@ -37,6 +38,9 @@ Examples:
 
     # High-quality generation with more diffusion steps
     python run_backbone_enumeration.py --length 10 --num-designs 50 --diffusion-steps 100
+
+    # Custom output directory
+    python run_backbone_enumeration.py --length 10 --num-designs 50 --output-dir ./my_outputs
 
 Recommended Parameters:
     - For quick exploration: 50-100 designs, 50 diffusion steps
@@ -66,14 +70,17 @@ Recommended Parameters:
         help="Number of diffusion timesteps (default: 50)",
     )
     parser.add_argument(
-        "--job-name",
+        "--output-dir",
         type=str,
-        help="Custom job name",
+        default=str(DEFAULT_OUTPUT_DIR),
+        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
     )
     parser.add_argument(
-        "--wait",
-        action="store_true",
-        help="Wait for job to complete before exiting",
+        "--device",
+        type=int,
+        default=None,
+        metavar="ID",
+        help="CUDA device ID (e.g., 0, 1, 2). If not specified, uses default GPU.",
     )
 
     args = parser.parse_args()
@@ -92,55 +99,43 @@ Recommended Parameters:
     if min_len < 5 or max_len > 30:
         print("Warning: Lengths outside 7-16 residues may have lower success rates")
 
-    # Build config
-    job_name = args.job_name or f"backbone_{min_len}mer"
-    if min_len != max_len:
-        job_name = args.job_name or f"backbone_{min_len}-{max_len}mer"
+    # Determine peptide length parameter
+    if min_len == max_len:
+        peptide_length = min_len
+    else:
+        peptide_length = (min_len, max_len)
 
-    config = {
-        "output_prefix": f"cyclic_{min_len}mer",
-        "num_designs": args.num_designs,
-        "contigs": f"{min_len}-{max_len}",
-        "cyclic": True,
-        "cyc_chains": "a",  # lowercase = self-cyclic
-        "diffusion_steps": args.diffusion_steps,
-    }
-
-    # Submit job
-    print(f"Submitting backbone enumeration job...")
+    # Run directly (no job queue)
+    print(f"Running backbone enumeration...")
     print(f"  Length: {min_len}-{max_len} residues")
     print(f"  Num designs: {args.num_designs}")
     print(f"  Diffusion steps: {args.diffusion_steps}")
+    print(f"  Output dir: {args.output_dir}")
+    print(f"  Device: {args.device if args.device is not None else 'default'}")
     print()
 
-    result = job_manager.submit_job(config=config, job_name=job_name)
+    try:
+        result = generate_cyclic_backbone(
+            peptide_length=peptide_length,
+            num_designs=args.num_designs,
+            output_dir=args.output_dir,
+            diffusion_steps=args.diffusion_steps,
+            device=args.device,
+        )
 
-    print(f"Job submitted: {result['job_id']}")
-    print(f"Queue position: {result['queue_position']}")
+        print(f"Generation completed successfully!")
+        print(f"Generated {result.num_generated} designs")
+        print(f"Output directory: {result.output_dir}")
+        print()
+        print("PDB files:")
+        for pdb in result.pdb_files[:10]:  # Show first 10
+            print(f"  {pdb}")
+        if len(result.pdb_files) > 10:
+            print(f"  ... and {len(result.pdb_files) - 10} more")
 
-    if args.wait:
-        import time
-        print()
-        print("Waiting for job to complete...")
-        job_id = result['job_id']
-        while True:
-            status = job_manager.get_job_status(job_id)
-            if status['status'] in ['completed', 'failed', 'cancelled']:
-                break
-            time.sleep(5)
-
-        print()
-        if status['status'] == 'completed':
-            result_info = job_manager.get_job_result(job_id)
-            print(f"Job completed successfully!")
-            print(f"Output files ({result_info.get('num_generated', 0)} designs):")
-            for pdb in result_info.get('pdb_files', []):
-                print(f"  {pdb}")
-        else:
-            print(f"Job {status['status']}: {status.get('error', 'Unknown error')}")
-    else:
-        print()
-        print(f"Check status: python scripts/manage_jobs.py status {result['job_id']}")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

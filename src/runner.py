@@ -28,13 +28,14 @@ class RFDiffusionConfig:
     Attributes:
         output_prefix: Path prefix for output files (without extension).
         num_designs: Number of designs to generate.
-        contigs: Contig specification string (e.g., "A1-180/0 12-16").
+        contigs: Contig specification string (e.g., "12-16 A1-180/0").
         cyclic: Whether to generate cyclic peptides.
-        cyc_chains: Chain(s) to make cyclic ('a' for self-cyclic, 'B' for binder).
+        cyc_chains: Chain(s) to make cyclic ('a' for self-cyclic binder).
         diffusion_steps: Number of diffusion timesteps.
         input_pdb: Optional path to input/target PDB file.
         hotspot_res: Optional hotspot residue string (e.g., "A46,A48,A49").
         config_name: Hydra config name (default: "base").
+        device: CUDA device ID (e.g., 0, 1, 2). If None, uses default GPU.
     """
     output_prefix: str
     num_designs: int
@@ -45,6 +46,7 @@ class RFDiffusionConfig:
     input_pdb: Optional[str] = None
     hotspot_res: Optional[str] = None
     config_name: str = "base"
+    device: Optional[int] = None
 
 
 def build_command(config: RFDiffusionConfig) -> list[str]:
@@ -115,6 +117,12 @@ def run_rfdiffusion(config: RFDiffusionConfig, output_dir: str) -> "GenerationRe
     cmd = build_command(config)
     cmd_str = " ".join(cmd)
 
+    # Set up environment with CUDA device selection
+    env = os.environ.copy()
+    if config.device is not None:
+        env["CUDA_VISIBLE_DEVICES"] = str(config.device)
+        cmd_str = f"CUDA_VISIBLE_DEVICES={config.device} " + cmd_str
+
     # Execute from RFdiffusion directory
     try:
         result = subprocess.run(
@@ -123,6 +131,7 @@ def run_rfdiffusion(config: RFDiffusionConfig, output_dir: str) -> "GenerationRe
             capture_output=True,
             text=True,
             check=True,
+            env=env,
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(

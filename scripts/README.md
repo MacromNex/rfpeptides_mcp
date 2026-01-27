@@ -1,26 +1,32 @@
 # RFpeptides Scripts
 
 Command-line scripts for cyclic peptide backbone generation using RFdiffusion.
+These scripts run directly as local jobs (no job queue) and output to the `results/` directory by default.
 
 ## Available Scripts
 
-| Script | Purpose | Use Cases |
-|--------|---------|-----------|
-| `run_binder_design.py` | Design binders against a target | Cases 1, 2, 4 |
-| `run_epitope_design.py` | Design binders with hotspot targeting | Case 3 |
-| `run_backbone_enumeration.py` | Generate unconditional backbones | Case 6 |
-| `manage_jobs.py` | Job monitoring and management | All |
+| Script | Purpose | Use Cases | Default Output |
+|--------|---------|-----------|----------------|
+| `run_binder_design.py` | Design binders against a target (linear or cyclic) | Cases 1, 2, 4 | `results/binder_outputs/` |
+| `run_epitope_design.py` | Design binders with hotspot targeting (linear or cyclic) | Case 3 | `results/epitope_outputs/` |
+| `run_backbone_enumeration.py` | Generate unconditional cyclic backbones | Case 6 | `results/backbone_outputs/` |
 
 ## Quick Start
 
 ### 1. Design Binders for a Target Protein
 
 ```bash
-# Use predefined target (MCL1, MDM2, GABARAP, RbtA)
+# Design linear binders for MCL1 (predefined target)
 python scripts/run_binder_design.py --target mcl1 --num-designs 50
+
+# Design cyclic binders for MCL1
+python scripts/run_binder_design.py --target mcl1 --num-designs 50 --cyclic
 
 # Use custom PDB
 python scripts/run_binder_design.py --pdb /path/to/target.pdb --chain A --num-designs 100
+
+# Custom output directory with cyclic binders
+python scripts/run_binder_design.py --target gabarap --num-designs 20 --cyclic --output-dir ./my_outputs
 
 # List available predefined targets
 python scripts/run_binder_design.py --list-targets
@@ -29,11 +35,17 @@ python scripts/run_binder_design.py --list-targets
 ### 2. Design Binders with Hotspot Targeting
 
 ```bash
-# Use predefined target with known hotspots
+# Design linear binders targeting GABARAP LIR-docking site
 python scripts/run_epitope_design.py --target gabarap --num-designs 50
+
+# Design cyclic binders targeting GABARAP
+python scripts/run_epitope_design.py --target gabarap --num-designs 50 --cyclic
 
 # Use custom hotspots
 python scripts/run_epitope_design.py --pdb target.pdb --hotspots 46 48 49 50 60 63 --num-designs 100
+
+# Custom output directory with cyclic binders
+python scripts/run_epitope_design.py --target mcl1 --num-designs 20 --cyclic --output-dir ./my_outputs
 
 # List available targets with hotspots
 python scripts/run_epitope_design.py --list-targets
@@ -47,28 +59,9 @@ python scripts/run_backbone_enumeration.py --length 10 --num-designs 100
 
 # Generate variable-length backbones (8-12 residues)
 python scripts/run_backbone_enumeration.py --length 8 12 --num-designs 500
-```
 
-### 4. Manage Jobs
-
-```bash
-# List all jobs
-python scripts/manage_jobs.py list
-
-# Check job status
-python scripts/manage_jobs.py status <job_id>
-
-# Get job results
-python scripts/manage_jobs.py result <job_id>
-
-# View job log
-python scripts/manage_jobs.py log <job_id>
-
-# Cancel a job
-python scripts/manage_jobs.py cancel <job_id>
-
-# Resubmit a failed job
-python scripts/manage_jobs.py resubmit <job_id>
+# Custom output directory
+python scripts/run_backbone_enumeration.py --length 10 --num-designs 50 --output-dir ./my_outputs
 ```
 
 ## Parameters Guide
@@ -99,19 +92,44 @@ python scripts/manage_jobs.py resubmit <job_id>
 | Standard | 50 | Good balance (default) |
 | High | 100 | More diversity |
 
+### GPU Device Selection
+
+All scripts support the `--device` parameter to select which CUDA GPU to use:
+
+```bash
+# Use GPU 0
+python scripts/run_binder_design.py --target mcl1 --num-designs 50 --device 0
+
+# Use GPU 1
+python scripts/run_backbone_enumeration.py --length 10 --num-designs 100 --device 1
+
+# Use default GPU (no --device flag)
+python scripts/run_epitope_design.py --target gabarap --num-designs 50
+```
+
+This sets `CUDA_VISIBLE_DEVICES` internally. If `--device` is not specified, the default GPU is used.
+
 ## Output
 
-All job outputs are stored in the `jobs/` directory:
+All outputs are stored in the `results/` directory by default:
 
 ```
-jobs/
-└── <job_id>/
-    ├── metadata.json     # Job configuration
-    ├── job.log          # Execution log
-    ├── result.json      # Output summary
-    ├── *.pdb            # Generated structures
-    └── *.trb            # Trajectory metadata
+results/
+├── backbone_outputs/    # Unconditional backbone generation
+│   ├── cyclic_10mer_0.pdb
+│   ├── cyclic_10mer_0.trb
+│   └── ...
+├── binder_outputs/      # Target binder design
+│   ├── 2PQK_binder_0.pdb
+│   ├── 2PQK_binder_0.trb
+│   └── ...
+└── epitope_outputs/     # Hotspot-guided design
+    ├── 3D32_epitope_0.pdb
+    ├── 3D32_epitope_0.trb
+    └── ...
 ```
+
+Use `--output-dir` to specify a custom output directory.
 
 ## Environment
 
