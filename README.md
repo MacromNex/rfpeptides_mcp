@@ -21,7 +21,7 @@ This MCP server provides computational tools for cyclic peptide backbone generat
 |------|-------------|
 | `submit_cyclic_backbone` | Generate unconditional cyclic peptide backbones for structural space enumeration |
 | `submit_cyclic_binder` | Design cyclic peptide binder backbones against a target protein |
-| `submit_cyclic_binder_with_hotspots` | Design cyclic binders with epitope-specific hotspot targeting |
+| `submit_cyclic_binder_with_hotspots` | Design cyclic binder backbones with epitope-specific hotspot targeting |
 
 #### Job Management Tools
 | Tool | Description |
