@@ -360,7 +360,7 @@ Design binders for the RbtA target at @examples/structures/targets/9CDV.pdb
 
 #### Use Case 3: Epitope-Specific Design
 ```
-Submit a binder design job for GABARAP targeting hotspot residues 46, 48, 49, 50, 60, 63 using submit_cyclic_binder_with_hotspots
+Submit a binder design job for GABARAP (examples/structures/targets/7ZKR.pdb) targeting hotspot residues Lys48, Lys50, Tyr51, Leu52, Phe62, and Leu65 using submit_cyclic_binder_with_hotspots.
 ```
 
 #### Use Case 4: Rapid Discovery
