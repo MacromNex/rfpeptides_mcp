@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.0.1-cuda11.8-cudnn8-runtime
+FROM pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
 
 LABEL org.opencontainers.image.source="https://github.com/macronex/rfpeptides_mcp"
 LABEL org.opencontainers.image.description="RFDiffusion All-Atom for cyclic peptide backbone generation"
@@ -36,11 +36,16 @@ RUN cd /app/repo/RFdiffusion/env/SE3Transformer && \
     pip install --no-cache-dir -e .
 
 # Copy MCP server source
-COPY src/ src/
+COPY --chmod=755 src/ src/
 
 # Download RFdiffusion model weights (done at build time for reproducibility)
 RUN mkdir -p /app/repo/RFdiffusion/models && \
     wget -q -O /app/repo/RFdiffusion/models/RFdiffusion_aa.pt \
     https://files.ipd.uw.edu/dimaio/RFdiffusion_aa.pt || true
 
+# Create writable directories for jobs/results
+RUN mkdir -p /app/jobs /app/results && chmod 777 /app /app/jobs /app/results
+
+ENV NVIDIA_CUDA_END_OF_LIFE=0
+ENTRYPOINT []
 CMD ["python", "src/server.py"]
