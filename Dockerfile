@@ -26,9 +26,9 @@ RUN pip install --no-cache-dir \
 # DGL with CUDA 11.8
 RUN pip install --no-cache-dir dgl -f https://data.dgl.ai/wheels/cu118/repo.html
 
-# Copy local RFDiffusion repo (upstream is private, cannot git clone)
-COPY repo/rfd_macro/ /app/repo/RFdiffusion/
-RUN cd /app/repo/RFdiffusion && \
+# Clone RFDiffusion from public RosettaCommons repo
+RUN git clone https://github.com/RosettaCommons/RFdiffusion.git /app/repo/RFdiffusion && \
+    cd /app/repo/RFdiffusion && \
     pip install --no-cache-dir -e .
 
 # Install SE3-Transformer
