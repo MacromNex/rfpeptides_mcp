@@ -27,12 +27,14 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir dgl -f https://data.dgl.ai/wheels/cu118/repo.html
 
 # Clone RFDiffusion from public RosettaCommons repo
-RUN git clone https://github.com/RosettaCommons/RFdiffusion.git /app/repo/RFdiffusion && \
-    cd /app/repo/RFdiffusion && \
+RUN git clone https://github.com/RosettaCommons/RFdiffusion.git /app/repo/RFdiffusion
+
+# Install SE3-Transformer first (required dependency of rfdiffusion)
+RUN cd /app/repo/RFdiffusion/env/SE3Transformer && \
     pip install --no-cache-dir -e .
 
-# Install SE3-Transformer
-RUN cd /app/repo/RFdiffusion/env/SE3Transformer && \
+# Install RFDiffusion
+RUN cd /app/repo/RFdiffusion && \
     pip install --no-cache-dir -e .
 
 # Copy MCP server source
