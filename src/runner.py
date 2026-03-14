@@ -13,12 +13,17 @@ from typing import Optional
 # Resolve paths relative to this file's location
 _MODULE_DIR = Path(__file__).parent.absolute()
 _MCP_ROOT = _MODULE_DIR.parent
-_RFDIFF_DIR = _MCP_ROOT / "repo" / "rfd_macro"
+
+# RFdiffusion directory - can be overridden via environment variable (e.g., in Docker)
+_RFDIFF_DIR = Path(os.environ.get("RFPEPTIDES_RFDIFF_DIR", str(_MCP_ROOT / "repo" / "rfd_macro")))
 _ENV_PATH = _MCP_ROOT / "env_rfpeptides"
 
 # Default mamba path - can be overridden via environment variable
 _DEFAULT_MAMBA = "/home/xux/miniforge3/bin/mamba"
 MAMBA_PATH = os.environ.get("RFPEPTIDES_MAMBA_PATH", _DEFAULT_MAMBA)
+
+# Docker mode: skip mamba if not available
+_USE_MAMBA = Path(MAMBA_PATH).exists() and _ENV_PATH.exists()
 
 
 @dataclass
@@ -58,9 +63,12 @@ def build_command(config: RFDiffusionConfig) -> list[str]:
     Returns:
         List of command arguments for subprocess execution.
     """
-    cmd = [
-        MAMBA_PATH, "run", "-p", str(_ENV_PATH),
-        "python", "scripts/run_inference.py",
+    if _USE_MAMBA:
+        cmd = [MAMBA_PATH, "run", "-p", str(_ENV_PATH), "python"]
+    else:
+        cmd = ["python"]
+    cmd += [
+        "scripts/run_inference.py",
         f"--config-name={config.config_name}",
         f"inference.output_prefix={config.output_prefix}",
         f"inference.num_designs={config.num_designs}",
@@ -100,10 +108,10 @@ def run_rfdiffusion(config: RFDiffusionConfig, output_dir: str) -> "GenerationRe
     if not _RFDIFF_DIR.exists():
         raise FileNotFoundError(
             f"RFdiffusion directory not found: {_RFDIFF_DIR}\n"
-            "Please ensure rfd_macro is properly linked in repo/"
+            "Set RFPEPTIDES_RFDIFF_DIR or ensure repo is properly linked."
         )
 
-    if not _ENV_PATH.exists():
+    if _USE_MAMBA and not _ENV_PATH.exists():
         raise FileNotFoundError(
             f"RFpeptides environment not found: {_ENV_PATH}\n"
             "Please create the conda environment first."

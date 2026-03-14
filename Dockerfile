@@ -40,14 +40,13 @@ RUN cd /app/repo/RFdiffusion && \
 # Copy MCP server source
 COPY --chmod=755 src/ src/
 
-# Download RFdiffusion model weights (done at build time for reproducibility)
-RUN mkdir -p /app/repo/RFdiffusion/models && \
-    wget -q -O /app/repo/RFdiffusion/models/RFdiffusion_aa.pt \
-    https://files.ipd.uw.edu/dimaio/RFdiffusion_aa.pt || true
+# Create mount point for model weights (mounted at runtime from cache)
+RUN mkdir -p /app/repo/RFdiffusion/models
 
 # Create writable directories for jobs/results
 RUN mkdir -p /app/jobs /app/results && chmod 777 /app /app/jobs /app/results
 
+ENV RFPEPTIDES_RFDIFF_DIR=/app/repo/RFdiffusion
 ENV NVIDIA_CUDA_END_OF_LIFE=0
 ENTRYPOINT []
 CMD ["python", "src/server.py"]
