@@ -13,18 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git wget build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# MCP server dependencies (Python 3.10 env)
+# Pin torch to the version shipped in the base image so pip doesn't
+# upgrade it and pull in multi-GB nvidia-cu12 / triton packages.
 RUN pip install --no-cache-dir \
-    fastmcp loguru click pandas numpy tqdm biopython
-
-# RFDiffusion dependencies
-RUN pip install --no-cache-dir \
-    hydra-core omegaconf e3nn wandb \
-    icecream assertpy decorator \
-    pyrsistent opt_einsum jax
+    "torch==2.1.0" \
+    fastmcp loguru click pandas numpy tqdm biopython \
+    hydra-core omegaconf e3nn \
+    icecream assertpy decorator pyrsistent
 
 # DGL with CUDA 11.8
-RUN pip install --no-cache-dir dgl -f https://data.dgl.ai/wheels/cu118/repo.html
+RUN pip install --no-cache-dir "torchdata==0.7.1" "dgl==2.1.0+cu118" -f https://data.dgl.ai/wheels/cu118/repo.html
 
 # Clone RFDiffusion from public RosettaCommons repo
 RUN git clone https://github.com/RosettaCommons/RFdiffusion.git /app/repo/RFdiffusion
@@ -33,9 +31,13 @@ RUN git clone https://github.com/RosettaCommons/RFdiffusion.git /app/repo/RFdiff
 RUN cd /app/repo/RFdiffusion/env/SE3Transformer && \
     pip install --no-cache-dir -e .
 
-# Install RFDiffusion
+# Install RFDiffusion (--no-deps since torch + se3-transformer already installed)
 RUN cd /app/repo/RFdiffusion && \
-    pip install --no-cache-dir -e .
+    pip install --no-cache-dir --no-deps -e .
+
+# Remove build tools no longer needed at runtime
+RUN apt-get purge -y build-essential && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy MCP server source
 COPY --chmod=755 src/ src/
